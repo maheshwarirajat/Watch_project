@@ -23,6 +23,8 @@ import android.widget.Toast;
 import android.content.Context;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import ai.kitt.snowboy.audio.AudioDataSaver;
 import ai.kitt.snowboy.demo.R;
@@ -40,6 +42,7 @@ public class Demo extends Activity {
 
     private int preVolume = -1;
     private static long activeTimes = 0;
+    private int CAMERA_ACCESS_CODE = 1234;
 
     private RecordingThread recordingThread;
     private PlaybackThread playbackThread;
@@ -168,8 +171,10 @@ public class Demo extends Activity {
             }
         }
     };
+
+
      
-    public Handler handle = new Handler() {
+     public Handler handle = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             MsgEnum message = MsgEnum.getMsgEnum(msg.what);
@@ -183,14 +188,13 @@ public class Demo extends Activity {
                     ////// CAMERA CODE
 
                     Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                    imagefile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),"test.jpg");
-                    Uri tempuri=Uri.fromFile(imagefile);
-                    intent.putExtra(MediaStore.EXTRA_OUTPUT, tempuri);
-                    intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY,1);
-                    Log.v(TAG, "intent created");
-                    startActivityForResult(intent, 0);
-                    Log.v(TAG, "activity started");
 
+                    // getting file name and location
+                    imagefile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),generate_name());
+                    intent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(imagefile));
+                    intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY,1);
+
+                    startActivityForResult(intent, CAMERA_ACCESS_CODE);
                     ////// CAMERA CODE
 
                     break;
@@ -214,29 +218,25 @@ public class Demo extends Activity {
     };
 
 
+    private String generate_name()
+    {
+        SimpleDateFormat sdf= new SimpleDateFormat("yyyyMMdd_HHmmss");
+        String timestamp=sdf.format(new Date());
+        return "INCIDENT" + timestamp + " .jpg";
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data )
     {
-        Log.v(TAG, "in onactivityresult");
-        if(requestCode == 0)
+        if(requestCode == CAMERA_ACCESS_CODE && resultCode==Activity.RESULT_OK)
         {
-            Log.v(TAG, "request granted");
-            switch (resultCode)
+            if(imagefile.exists())
             {
-                case Activity.RESULT_OK:
-                    if(imagefile.exists())
-                    {
-                        Toast.makeText(this, "The file was saved at" + imagefile.getAbsolutePath(), Toast.LENGTH_LONG).show();
-                    }
-                    else
-                    {
-                        Toast.makeText(this, "There was an error saving this file ", Toast.LENGTH_LONG).show();
-                    }
-                    break;
-                case Activity.RESULT_CANCELED:
-                    break;
-                default:
-                    break;
+                Toast.makeText(this, "The file was saved at" + imagefile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+            }
+            else
+            {
+                Toast.makeText(this, "There was an error saving this file ", Toast.LENGTH_LONG).show();
             }
         }
     }
