@@ -4,11 +4,16 @@ import ai.kitt.snowboy.audio.RecordingThread;
 import ai.kitt.snowboy.audio.PlaybackThread;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.media.AudioManager;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.MediaStore;
 import android.text.Html;
+import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -17,8 +22,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.content.Context;
 
+import java.io.File;
+
 import ai.kitt.snowboy.audio.AudioDataSaver;
 import ai.kitt.snowboy.demo.R;
+
+import static android.content.ContentValues.TAG;
 
 
 public class Demo extends Activity {
@@ -34,6 +43,8 @@ public class Demo extends Activity {
 
     private RecordingThread recordingThread;
     private PlaybackThread playbackThread;
+
+    private File imagefile;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -168,6 +179,20 @@ public class Demo extends Activity {
                     updateLog(" ----> Detected " + activeTimes + " times", "green");
                     // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
                     showToast("Active "+activeTimes);
+
+                    ////// CAMERA CODE
+
+                    Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                    imagefile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),"test.jpg");
+                    Uri tempuri=Uri.fromFile(imagefile);
+                    intent.putExtra(MediaStore.EXTRA_OUTPUT, tempuri);
+                    intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY,1);
+                    Log.v(TAG, "intent created");
+                    startActivityForResult(intent, 0);
+                    Log.v(TAG, "activity started");
+
+                    ////// CAMERA CODE
+
                     break;
                 case MSG_INFO:
                     updateLog(" ----> "+message);
@@ -187,6 +212,34 @@ public class Demo extends Activity {
              }
         }
     };
+
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data )
+    {
+        Log.v(TAG, "in onactivityresult");
+        if(requestCode == 0)
+        {
+            Log.v(TAG, "request granted");
+            switch (resultCode)
+            {
+                case Activity.RESULT_OK:
+                    if(imagefile.exists())
+                    {
+                        Toast.makeText(this, "The file was saved at" + imagefile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+                    }
+                    else
+                    {
+                        Toast.makeText(this, "There was an error saving this file ", Toast.LENGTH_LONG).show();
+                    }
+                    break;
+                case Activity.RESULT_CANCELED:
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
 
      public void updateLog(final String text) {
 
