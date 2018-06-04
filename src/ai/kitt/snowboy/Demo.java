@@ -12,6 +12,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.provider.MediaStore;
+import android.telephony.SmsManager;
 import android.text.Html;
 import android.util.Log;
 import android.view.View;
@@ -43,6 +44,7 @@ public class Demo extends Activity {
     private int preVolume = -1;
     private static long activeTimes = 0;
     private int CAMERA_ACCESS_CODE = 1234;
+    private int LOC_REQ_CODE= 1;
 
     private RecordingThread recordingThread;
     private PlaybackThread playbackThread;
@@ -185,6 +187,11 @@ public class Demo extends Activity {
                     // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
                     showToast("Active "+activeTimes);
 
+                    ////GPS Code///
+                    Intent intent1 = new Intent(Demo.this,GPSActivity.class);
+                    startActivity(intent1);
+                    ////GPS Code///
+
                     ////// CAMERA CODE
 
                     Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
@@ -196,6 +203,12 @@ public class Demo extends Activity {
 
                     startActivityForResult(intent, CAMERA_ACCESS_CODE);
                     ////// CAMERA CODE
+
+                    ///// Message Code ////
+                    Intent intent3 = new Intent(Demo.this,SMSActivity.class);
+                    startActivity(intent3);
+                    finish();
+                    ///// Message Code ////
 
                     break;
                 case MSG_INFO:
