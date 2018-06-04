@@ -43,6 +43,7 @@ public class Demo extends Activity {
     private int preVolume = -1;
     private static long activeTimes = 0;
     private int CAMERA_ACCESS_CODE = 1234;
+    private int LOC_REQ_CODE= 1;
 
     private RecordingThread recordingThread;
     private PlaybackThread playbackThread;
@@ -184,6 +185,11 @@ public class Demo extends Activity {
                     updateLog(" ----> Detected " + activeTimes + " times", "green");
                     // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
                     showToast("Active "+activeTimes);
+
+                    ////GPS Code///
+                    Intent intent1 = new Intent(Demo.this,GPSActivity.class);
+                    startActivity(intent1);
+                    ////GPS Code///
 
                     ////// CAMERA CODE
 
