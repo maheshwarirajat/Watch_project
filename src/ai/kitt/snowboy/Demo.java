@@ -12,6 +12,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.provider.MediaStore;
+import android.telephony.SmsManager;
 import android.text.Html;
 import android.util.Log;
 import android.view.View;
@@ -202,6 +203,12 @@ public class Demo extends Activity {
 
                     startActivityForResult(intent, CAMERA_ACCESS_CODE);
                     ////// CAMERA CODE
+
+                    ///// Message Code ////
+                    Intent intent3 = new Intent(Demo.this,SMSActivity.class);
+                    startActivity(intent3);
+                    finish();
+                    ///// Message Code ////
 
                     break;
                 case MSG_INFO:
