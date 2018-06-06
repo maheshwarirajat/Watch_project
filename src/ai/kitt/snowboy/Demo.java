@@ -3,15 +3,25 @@ package ai.kitt.snowboy;
 import ai.kitt.snowboy.audio.RecordingThread;
 import ai.kitt.snowboy.audio.PlaybackThread;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.hardware.Camera;
+import android.hardware.Camera.CameraInfo;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.media.AudioManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.provider.MediaStore;
+import android.provider.Settings;
+import android.telephony.SmsManager;
 import android.text.Html;
 import android.util.Log;
 import android.view.View;
@@ -42,12 +52,19 @@ public class Demo extends Activity {
 
     private int preVolume = -1;
     private static long activeTimes = 0;
-    private int CAMERA_ACCESS_CODE = 1234;
 
     private RecordingThread recordingThread;
     private PlaybackThread playbackThread;
 
-    private File imagefile;
+    //////////////////////////////////////////// added
+    private int CAMERA_ACCESS_CODE = 1234;
+    //private File imagefile;
+    private File default_location=Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
+    private Camera camera;
+    private int cameraId=0;
+    private LocationManager locationManager;
+    private LocationListener locationlistener;
+    private String sms_text = "HELP ME SAMARTH";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -58,8 +75,10 @@ public class Demo extends Activity {
         
         setProperVolume();
 
-          AppResCopy.copyResFromAssetsToSD(this);
-        
+        AppResCopy.copyResFromAssetsToSD(this);
+
+        //check_permisssions();
+
         activeTimes = 0;
         recordingThread = new RecordingThread(handle, new AudioDataSaver());
         playbackThread = new PlaybackThread();
@@ -187,15 +206,77 @@ public class Demo extends Activity {
 
                     ////// CAMERA CODE
 
-                    Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                    // do we have a camera?
+                    if (!getPackageManager()
+                            .hasSystemFeature(PackageManager.FEATURE_CAMERA)) {
+                        showToast( "No camera on this device");
 
-                    // getting file name and location
-                    imagefile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),generate_name());
-                    intent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(imagefile));
-                    intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY,1);
+                    } else {
+                        cameraId = findFrontFacingCamera();
+                        if (cameraId < 0) {
+                            showToast("No front facing camera found.");
 
-                    startActivityForResult(intent, CAMERA_ACCESS_CODE);
-                    ////// CAMERA CODE
+                        } else {
+                            camera = Camera.open(cameraId);
+                        }
+                    }
+                    camera.startPreview();
+                    camera.takePicture(null,null,new photohandler(getApplicationContext(),default_location));
+
+                    ///// GPS LOCATION
+
+
+                    locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+                    locationlistener = new LocationListener() {
+                        @Override
+                        public void onLocationChanged(Location location) {
+                            sms_text=sms_text +"\n " + "longitude-> " + location.getLongitude() + " latitude-> " + location.getLatitude();
+                        }
+
+                        @Override
+                        public void onStatusChanged(String s, int i, Bundle bundle) {
+
+                        }
+
+                        @Override
+                        public void onProviderEnabled(String s) {
+
+                        }
+
+                        @Override
+                        public void onProviderDisabled(String s) {
+
+                            Intent i = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                            startActivity(i);
+                        }
+                    };
+
+                    locationManager.requestLocationUpdates("gps", 5000, 0, locationlistener);
+
+
+
+                    ////// SMS CODE
+
+                    String phoneNo = "9582816345";
+
+
+                    PackageManager pm = getApplicationContext().getPackageManager();
+
+                    if (!pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY) &&
+                            !pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_CDMA)) {
+                        showToast("Sorry, your device probably can't send SMS...");
+                    }
+
+                    try {
+                        SmsManager smsManager = SmsManager.getDefault();
+                        smsManager.sendTextMessage(phoneNo, null, sms_text, null, null);
+                        showToast("SMS Sent!");
+                    } catch (Exception e) {
+                        showToast("SMS faild, please try again later!");
+                        e.printStackTrace();
+                    }
+
 
                     break;
                 case MSG_INFO:
@@ -218,28 +299,22 @@ public class Demo extends Activity {
     };
 
 
-    private String generate_name()
-    {
-        SimpleDateFormat sdf= new SimpleDateFormat("yyyyMMdd_HHmmss");
-        String timestamp=sdf.format(new Date());
-        return "INCIDENT" + timestamp + " .jpg";
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data )
-    {
-        if(requestCode == CAMERA_ACCESS_CODE && resultCode==Activity.RESULT_OK)
-        {
-            if(imagefile.exists())
-            {
-                Toast.makeText(this, "The file was saved at" + imagefile.getAbsolutePath(), Toast.LENGTH_LONG).show();
-            }
-            else
-            {
-                Toast.makeText(this, "There was an error saving this file ", Toast.LENGTH_LONG).show();
+    private int findFrontFacingCamera() {
+        int cameraId = -1;
+        // Search for the front facing camera
+        int numberOfCameras = Camera.getNumberOfCameras();
+        for (int i = 0; i < numberOfCameras; i++) {
+            CameraInfo info = new CameraInfo();
+            Camera.getCameraInfo(i, info);
+            if (info.facing == CameraInfo.CAMERA_FACING_FRONT) {
+                Log.d(TAG, "Camera found");
+                cameraId = i;
+                break;
             }
         }
+        return cameraId;
     }
+
 
      public void updateLog(final String text) {
 
@@ -302,4 +377,27 @@ public class Demo extends Activity {
          recordingThread.stopRecording();
          super.onDestroy();
      }
+
+
+
+
+//    private void check_permission(){
+//
+//        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+//            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//                requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.INTERNET}
+//                        ,10);
+//            }
+//            return;
+//        }
+//
+//    }
+//        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+//            if(!(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)== PackageManager.PERMISSION_GRANTED)) {
+//                Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()));
+//                startActivity(intent);
+//                finish();
+//            }
+//        }
 }
