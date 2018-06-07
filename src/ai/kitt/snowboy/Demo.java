@@ -21,6 +21,9 @@ import android.os.Handler;
 import android.os.Message;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v7.app.AppCompatActivity;
 import android.telephony.SmsManager;
 import android.text.Html;
 import android.util.Log;
@@ -38,6 +41,11 @@ import java.util.Date;
 
 import ai.kitt.snowboy.audio.AudioDataSaver;
 import ai.kitt.snowboy.demo.R;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 
 import static android.content.ContentValues.TAG;
 
@@ -64,7 +72,10 @@ public class Demo extends Activity {
     private int cameraId=0;
     private LocationManager locationManager;
     private LocationListener locationlistener;
-    private String sms_text = "HELP ME SAMARTH";
+    private String sms_text = "HELP ME LALAN KUMAR";
+    private FusedLocationProviderClient mFusedLocationClient;
+    protected Location mLastLocation;
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -76,9 +87,8 @@ public class Demo extends Activity {
         setProperVolume();
 
         AppResCopy.copyResFromAssetsToSD(this);
-
+        mFusedLocationClient= LocationServices.getFusedLocationProviderClient(this);
         //check_permisssions();
-
         activeTimes = 0;
         recordingThread = new RecordingThread(handle, new AudioDataSaver());
         playbackThread = new PlaybackThread();
@@ -203,6 +213,7 @@ public class Demo extends Activity {
                     updateLog(" ----> Detected " + activeTimes + " times", "green");
                     // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
                     showToast("Active "+activeTimes);
+                    //sms_text="HELP ME LALAN KUMAR" + '\n' + "My location is";
 
                     ////// CAMERA CODE
 
@@ -225,40 +236,41 @@ public class Demo extends Activity {
 
                     ///// GPS LOCATION
 
-
-                    locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-
-                    locationlistener = new LocationListener() {
-                        @Override
-                        public void onLocationChanged(Location location) {
-                            sms_text=sms_text +"\n " + "longitude-> " + location.getLongitude() + " latitude-> " + location.getLatitude();
-                        }
-
-                        @Override
-                        public void onStatusChanged(String s, int i, Bundle bundle) {
-
-                        }
-
-                        @Override
-                        public void onProviderEnabled(String s) {
-
-                        }
-
-                        @Override
-                        public void onProviderDisabled(String s) {
-
-                            Intent i = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                            startActivity(i);
-                        }
-                    };
-
-                    locationManager.requestLocationUpdates("gps", 5000, 0, locationlistener);
-
-
+//                    locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+//
+//                    locationlistener = new LocationListener() {
+//                        @Override
+//                        public void onLocationChanged(Location location) {
+//                            sms_text=sms_text +"\n " + "longitude-> " + location.getLongitude() + " latitude-> " + location.getLatitude();
+//                        }
+//
+//                        @Override
+//                        public void onStatusChanged(String s, int i, Bundle bundle) {
+//
+//                        }
+//
+//                        @Override
+//                        public void onProviderEnabled(String s) {
+//
+//                        }
+//
+//                        @Override
+//                        public void onProviderDisabled(String s) {
+//
+//                            Intent i = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+//                            startActivity(i);
+//                        }
+//                    };
+//
+//
+//                    locationManager.requestLocationUpdates("gps", 5000, 0, locationlistener);
+                    updateLog("before getlocation");
+                    getLocation();
+                    updateLog("after getlocation");
 
                     ////// SMS CODE
 
-                    String phoneNo = "9582816345";
+                    String phoneNo = "8630270351";
 
 
                     PackageManager pm = getApplicationContext().getPackageManager();
@@ -297,6 +309,47 @@ public class Demo extends Activity {
              }
         }
     };
+
+
+     private void getLocation() {
+         updateLog("im in");
+         mFusedLocationClient.getLastLocation().addOnSuccessListener(this, new OnSuccessListener<Location>() {
+
+             @Override
+             public void onSuccess(Location location) {
+                 if(location!=null)
+                 {
+                     sms_text="HELP ME SAMARTH" +"\n " + "longitude-> " + location.getLongitude() + " latitude-> " + location.getLatitude();
+                 }
+                 else
+                 {
+                     Log.v(TAG,"getLastLocation:exception");
+                 }
+             }
+         });
+         updateLog("Im out");
+     }
+
+
+
+
+//    private void getLocation() {
+//        mFusedLocationClient.getLastLocation().addOnCompleteListener(this, new OnCompleteListener<Location>() {
+//            @Override
+//            public void onComplete(@NonNull Task<Location> task) {
+//                if(task.isSuccessful() && task.getResult()!= null)
+//                {
+//                    mLastLocation=task.getResult();
+//                    sms_text=sms_text +"\n " + "longitude-> " + mLastLocation.getLongitude() + " latitude-> " + mLastLocation.getLatitude();
+//                }
+//                else {
+//                    Log.v(TAG,"getLastLocation:exception",task.getException());
+//                }
+//            }
+//        });
+//
+//    }
+//
 
 
     private int findFrontFacingCamera() {
