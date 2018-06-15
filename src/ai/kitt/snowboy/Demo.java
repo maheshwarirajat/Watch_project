@@ -5,6 +5,7 @@ import ai.kitt.snowboy.audio.PlaybackThread;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
@@ -19,11 +20,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.provider.MediaStore;
-import android.provider.Settings;
-import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v7.app.AppCompatActivity;
 import android.telephony.SmsManager;
 import android.text.Html;
 import android.util.Log;
@@ -36,8 +32,7 @@ import android.widget.Toast;
 import android.content.Context;
 
 import java.io.File;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+
 
 import ai.kitt.snowboy.audio.AudioDataSaver;
 import ai.kitt.snowboy.demo.R;
@@ -67,14 +62,16 @@ public class Demo extends Activity {
     //////////////////////////////////////////// added
     private int CAMERA_ACCESS_CODE = 1234;
     //private File imagefile;
-    private File default_location=Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
+    private File default_location = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
     private Camera camera;
-    private int cameraId=0;
+    private int cameraId = 0;
     private LocationManager locationManager;
     private LocationListener locationlistener;
-    private String sms_text = "HELP ME LALAN KUMAR";
+    private String sms_text = "HELP ME";
     private FusedLocationProviderClient mFusedLocationClient;
     protected Location mLastLocation;
+    private boolean golablflag = false;
+
 
 
     @Override
@@ -83,64 +80,64 @@ public class Demo extends Activity {
 
         setContentView(R.layout.main);
         setUI();
-        
+
         setProperVolume();
 
         AppResCopy.copyResFromAssetsToSD(this);
-        mFusedLocationClient= LocationServices.getFusedLocationProviderClient(this);
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         //check_permisssions();
         activeTimes = 0;
         recordingThread = new RecordingThread(handle, new AudioDataSaver());
         playbackThread = new PlaybackThread();
     }
-    
+
     void showToast(CharSequence msg) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
     }
-    
+
     private void setUI() {
         record_button = (Button) findViewById(R.id.btn_test1);
         record_button.setOnClickListener(record_button_handle);
         record_button.setEnabled(true);
-        
+
         play_button = (Button) findViewById(R.id.btn_test2);
         play_button.setOnClickListener(play_button_handle);
         play_button.setEnabled(true);
 
-        log = (TextView)findViewById(R.id.log);
-        logView = (ScrollView)findViewById(R.id.logView);
+        log = (TextView) findViewById(R.id.log);
+        logView = (ScrollView) findViewById(R.id.logView);
     }
-    
+
     private void setMaxVolume() {
         AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         preVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        updateLog(" ----> preVolume = "+preVolume, "green");
+        updateLog(" ----> preVolume = " + preVolume, "green");
         int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        updateLog(" ----> maxVolume = "+maxVolume, "green");
+        updateLog(" ----> maxVolume = " + maxVolume, "green");
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0);
         int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        updateLog(" ----> currentVolume = "+currentVolume, "green");
+        updateLog(" ----> currentVolume = " + currentVolume, "green");
     }
-    
+
     private void setProperVolume() {
         AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         preVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        updateLog(" ----> preVolume = "+preVolume, "green");
+        updateLog(" ----> preVolume = " + preVolume, "green");
         int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        updateLog(" ----> maxVolume = "+maxVolume, "green");
-        int properVolume = (int) ((float) maxVolume * 0.2); 
+        updateLog(" ----> maxVolume = " + maxVolume, "green");
+        int properVolume = (int) ((float) maxVolume * 0.2);
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, properVolume, 0);
         int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        updateLog(" ----> currentVolume = "+currentVolume, "green");
+        updateLog(" ----> currentVolume = " + currentVolume, "green");
     }
-    
+
     private void restoreVolume() {
-        if(preVolume>=0) {
+        if (preVolume >= 0) {
             AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, preVolume, 0);
-            updateLog(" ----> set preVolume = "+preVolume, "green");
+            updateLog(" ----> set preVolume = " + preVolume, "green");
             int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-            updateLog(" ----> currentVolume = "+currentVolume, "green");
+            updateLog(" ----> currentVolume = " + currentVolume, "green");
         }
     }
 
@@ -170,14 +167,16 @@ public class Demo extends Activity {
     }
 
     private void sleep() {
-        try { Thread.sleep(500);
-        } catch (Exception e) {}
+        try {
+            Thread.sleep(500);
+        } catch (Exception e) {
+        }
     }
-    
+
     private OnClickListener record_button_handle = new OnClickListener() {
         // @Override
         public void onClick(View arg0) {
-            if(record_button.getText().equals(getResources().getString(R.string.btn1_start))) {
+            if (record_button.getText().equals(getResources().getString(R.string.btn1_start))) {
                 stopPlayback();
                 sleep();
                 startRecording();
@@ -187,7 +186,7 @@ public class Demo extends Activity {
             }
         }
     };
-    
+
     private OnClickListener play_button_handle = new OnClickListener() {
         // @Override
         public void onClick(View arg0) {
@@ -202,17 +201,16 @@ public class Demo extends Activity {
     };
 
 
-     
-     public Handler handle = new Handler() {
+    public Handler handle = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             MsgEnum message = MsgEnum.getMsgEnum(msg.what);
-            switch(message) {
+            switch (message) {
                 case MSG_ACTIVE:
                     activeTimes++;
                     updateLog(" ----> Detected " + activeTimes + " times", "green");
                     // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
-                    showToast("Active "+activeTimes);
+                    showToast("Active " + activeTimes);
                     //sms_text="HELP ME LALAN KUMAR" + '\n' + "My location is";
 
                     ////// CAMERA CODE
@@ -220,7 +218,7 @@ public class Demo extends Activity {
                     // do we have a camera?
                     if (!getPackageManager()
                             .hasSystemFeature(PackageManager.FEATURE_CAMERA)) {
-                        showToast( "No camera on this device");
+                        showToast("No camera on this device");
 
                     } else {
                         cameraId = findFrontFacingCamera();
@@ -232,7 +230,7 @@ public class Demo extends Activity {
                         }
                     }
                     camera.startPreview();
-                    camera.takePicture(null,null,new photohandler(getApplicationContext(),default_location));
+                    camera.takePicture(null, null, new photohandler(getApplicationContext(), default_location));
 
                     ///// GPS LOCATION
 
@@ -270,7 +268,7 @@ public class Demo extends Activity {
 
                     ////// SMS CODE
 
-                    String phoneNo = "8630270351";
+                    String phoneNo = "8447828766";
 
 
                     PackageManager pm = getApplicationContext().getPackageManager();
@@ -282,7 +280,7 @@ public class Demo extends Activity {
 
                     try {
                         SmsManager smsManager = SmsManager.getDefault();
-                        smsManager.sendTextMessage(phoneNo, null, sms_text, null, null);
+                        //smsManager.sendTextMessage(phoneNo, null, sms_text, null, null);
                         showToast("SMS Sent!");
                     } catch (Exception e) {
                         showToast("SMS faild, please try again later!");
@@ -292,7 +290,7 @@ public class Demo extends Activity {
 
                     break;
                 case MSG_INFO:
-                    updateLog(" ----> "+message);
+                    updateLog(" ----> " + message);
                     break;
                 case MSG_VAD_SPEECH:
                     updateLog(" ----> normal voice", "blue");
@@ -306,31 +304,30 @@ public class Demo extends Activity {
                 default:
                     super.handleMessage(msg);
                     break;
-             }
+            }
         }
     };
 
 
-     private void getLocation() {
-         updateLog("im in");
-         mFusedLocationClient.getLastLocation().addOnSuccessListener(this, new OnSuccessListener<Location>() {
+    private void getLocation() {
+        updateLog("im in");
+        mFusedLocationClient.getLastLocation().addOnSuccessListener(this, new OnSuccessListener<Location>() {
 
-             @Override
-             public void onSuccess(Location location) {
-                 if(location!=null)
-                 {
-                     sms_text="HELP ME SAMARTH" +"\n " + "longitude-> " + location.getLongitude() + " latitude-> " + location.getLatitude();
-                 }
-                 else
-                 {
-                     Log.v(TAG,"getLastLocation:exception");
-                 }
-             }
-         });
-         updateLog("Im out");
-     }
+            @Override
+            public void onSuccess(Location location) {
 
-
+                if (!golablflag) {
+                    sms_text = "HELP ME " + "\n " + "longitude-> " + location.getLongitude() + " latitude-> " + location.getLatitude();
+                    golablflag = true;
+                } else if (location != null) {
+                    sms_text = "HELP ME" + "\n " + "longitude-> " + location.getLongitude() + " latitude-> " + location.getLatitude();
+                } else {
+                    Log.v(TAG, "getLastLocation:exception");
+                }
+            }
+        });
+        updateLog("Im out");
+    }
 
 
 //    private void getLocation() {
@@ -369,21 +366,21 @@ public class Demo extends Activity {
     }
 
 
-     public void updateLog(final String text) {
+    public void updateLog(final String text) {
 
-         log.post(new Runnable() {
-             @Override
-             public void run() {
-                 if (currLogLineNum >= MAX_LOG_LINE_NUM) {
-                     int st = strLog.indexOf("<br>");
-                     strLog = strLog.substring(st+4);
-                 } else {
-                     currLogLineNum++;
-                 }
-                 String str = "<font color='white'>"+text+"</font>"+"<br>";
-                 strLog = (strLog == null || strLog.length() == 0) ? str : strLog + str;
-                 log.setText(Html.fromHtml(strLog));
-             }
+        log.post(new Runnable() {
+            @Override
+            public void run() {
+                if (currLogLineNum >= MAX_LOG_LINE_NUM) {
+                    int st = strLog.indexOf("<br>");
+                    strLog = strLog.substring(st + 4);
+                } else {
+                    currLogLineNum++;
+                }
+                String str = "<font color='white'>" + text + "</font>" + "<br>";
+                strLog = (strLog == null || strLog.length() == 0) ? str : strLog + str;
+                log.setText(Html.fromHtml(strLog));
+            }
         });
         logView.post(new Runnable() {
             @Override
@@ -400,13 +397,13 @@ public class Demo extends Activity {
         log.post(new Runnable() {
             @Override
             public void run() {
-                if(currLogLineNum>=MAX_LOG_LINE_NUM) {
+                if (currLogLineNum >= MAX_LOG_LINE_NUM) {
                     int st = strLog.indexOf("<br>");
-                    strLog = strLog.substring(st+4);
+                    strLog = strLog.substring(st + 4);
                 } else {
                     currLogLineNum++;
                 }
-                String str = "<font color='"+color+"'>"+text+"</font>"+"<br>";
+                String str = "<font color='" + color + "'>" + text + "</font>" + "<br>";
                 strLog = (strLog == null || strLog.length() == 0) ? str : strLog + str;
                 log.setText(Html.fromHtml(strLog));
             }
@@ -425,11 +422,15 @@ public class Demo extends Activity {
     }
 
     @Override
-     public void onDestroy() {
-         restoreVolume();
-         recordingThread.stopRecording();
-         super.onDestroy();
-     }
+    public void onDestroy() {
+        restoreVolume();
+        recordingThread.stopRecording();
+        super.onDestroy();
+    }
+
+
+}
+
 
 
 
@@ -453,4 +454,4 @@ public class Demo extends Activity {
 //                finish();
 //            }
 //        }
-}
+
