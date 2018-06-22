@@ -603,6 +603,42 @@ public class Demo extends Activity {
             // write your logic code if permission already granted
         }
     }
+    
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
 
+        switch (requestCode) {
+            case PERMISSIONS_MULTIPLE_REQUEST:
+                if (grantResults.length > 0) {
+                    boolean cameraPermission = grantResults[1] == PackageManager.PERMISSION_GRANTED;
+                    boolean sendSms = grantResults[0] == PackageManager.PERMISSION_GRANTED;
+                    boolean recordAudio=grantResults[2]== PackageManager.PERMISSION_GRANTED;
+                    boolean writeStorage=grantResults[3]== PackageManager.PERMISSION_GRANTED;
+                    boolean accessCoarseLocation=grantResults[4]== PackageManager.PERMISSION_GRANTED;
+                    boolean accessFineLocation=grantResults[5]== PackageManager.PERMISSION_GRANTED;
+                    if(cameraPermission && sendSms && recordAudio && writeStorage && accessCoarseLocation && accessFineLocation)
+                    {
+                        // write your logic here
+                    } else {
+                        Snackbar.make(getActivity().findViewById(android.R.id.content),
+                                "Please Grant Permissions to upload profile photo",
+                                Snackbar.LENGTH_INDEFINITE).setAction("ENABLE",
+                                new View.OnClickListener() {
+                                    @Override
+                                    public void onClick(View v) {
+                                        requestPermissions(
+                                                new String[]{Manifest.permission
+                                                        .SEND_SMS, Manifest.permission.CAMERA,Manifest.permission.RECORD_AUDIO,
+                                                        Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.ACCESS_COARSE_LOCATION,
+                                                        Manifest.permission.ACCESS_FINE_LOCATION},
+                                                PERMISSIONS_MULTIPLE_REQUEST);
+                                    }
+                                }).show();
+                    }
+                }
+                break;
+        }
+    }
 
 }
