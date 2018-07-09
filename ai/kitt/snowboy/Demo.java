@@ -8,6 +8,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
@@ -16,6 +17,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.media.AudioManager;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -36,10 +38,13 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 
 import ai.kitt.snowboy.audio.AudioDataSaver;
@@ -49,9 +54,11 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+//import com.google.android.gms.vision.CameraSource;
 
 import static android.content.ContentValues.TAG;
 import static com.google.android.gms.internal.zzagz.runOnUiThread;
+import android.os.AsyncTask;
 
 
 public class Demo extends Activity {
@@ -84,23 +91,327 @@ public class Demo extends Activity {
     private String SERVER_URL = "http://10.225.67.114/UploadToServer.php?";
 
 
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.main);
         setUI();
-
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);// Make to run your application only in portrait mode
         setProperVolume();
-
         AppResCopy.copyResFromAssetsToSD(this);
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        //check_permisssions();
+        ////////check_permisssions();
+
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//            check_permisssions();
+//
+//        } else {
+//            // write your logic here
+//        }
+        ////////////
+
+
         activeTimes = 0;
         recordingThread = new RecordingThread(handle, new AudioDataSaver());
         playbackThread = new PlaybackThread();
     }
+
+
+    android.hardware.Camera.PictureCallback mPicture = new android.hardware.Camera.PictureCallback() {
+        @Override
+        public void onPictureTaken(byte[] data, Camera camera) {
+
+            File pictureFileDir = default_location;
+
+            if (!pictureFileDir.exists() && !pictureFileDir.mkdirs()) {
+                showToast("Can't create directory to save image.");
+                return;
+
+            }
+
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyymmddhhmmss");
+            String date = dateFormat.format(new Date());
+            String photoFile = "Incident_" + date + ".jpg";
+
+            String filename = pictureFileDir.getPath() + File.separator + photoFile;
+
+            File pictureFile = new File(filename);
+
+            try {
+                FileOutputStream fos = new FileOutputStream(pictureFile);
+                fos.write(data);
+                fos.close();
+                showToast("New Image saved:" + photoFile);
+                global.Location=filename;
+                Log.v(TAG,"gloabl" + filename);
+                //uploadFile(global.Location);
+                Intent intent= new Intent(Demo.this,uploadActivity.class);
+
+                startActivity(intent);
+
+            } catch (Exception error) {
+                showToast("Image could not be saved." + error.getMessage());
+            }
+
+        }
+    };
+
+//    android.hardware.Camera.PictureCallback jpegcallback = new android.hardware.Camera.PictureCallback() {
+//        @Override
+//        public  void onPictureTaken(byte data[], Camera camera){
+//            uploadFile(global.Location);
+//        }
+//
+//    };
+
+
+    public Handler handle = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            MsgEnum message = MsgEnum.getMsgEnum(msg.what);
+            switch (message) {
+                case MSG_ACTIVE:
+                    activeTimes++;
+                    global.Location="";
+                    updateLog(" ----> Detected " + activeTimes + " times", "green");
+                    // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
+                    showToast("Active " + activeTimes);
+                    //sms_text="HELP ME LALAN KUMAR" + '\n' + "My location is";
+
+                    ////// CAMERA CODE
+
+                    // do we have a camera?
+                    if (!getPackageManager()
+                            .hasSystemFeature(PackageManager.FEATURE_CAMERA)) {
+                        showToast("No camera on this device");
+
+                    } else {
+                        cameraId = findFrontFacingCamera();
+                        if (cameraId < 0) {
+                            showToast("No front facing camera found.");
+
+                        } else {
+                            camera = Camera.open(cameraId);
+                        }
+                    }
+
+
+
+                    ///// GPS LOCATION
+                    updateLog("before getlocation");
+                    //getLocation();
+                    updateLog("after getlocation");
+
+                    ////// SMS CODE
+
+                    String phoneNo = "8447828766";
+
+
+                    PackageManager pm = getApplicationContext().getPackageManager();
+
+                    if (!pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY) &&
+                            !pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_CDMA)) {
+                        showToast("Sorry, your device probably can't send SMS...");
+                    }
+
+                    try {
+                        SmsManager smsManager = SmsManager.getDefault();
+                        //smsManager.sendTextMessage(phoneNo, null, sms_text, null, null);
+                        showToast("SMS Sent!");
+                    } catch (Exception e) {
+                        showToast("SMS faild, please try again later!");
+                        e.printStackTrace();
+                    }
+
+                    camera.startPreview();
+                    //camera.takePicture(null, null, new photohandler(getApplicationContext(), default_location));
+                    camera.takePicture(null,null, mPicture);
+
+                    //MyAsyncTask myAsyncTasks = new MyAsyncTask();
+                    //myAsyncTasks.execute();
+
+                    break;
+                case MSG_INFO:
+                    updateLog(" ----> " + message);
+                    break;
+                case MSG_VAD_SPEECH:
+                    updateLog(" ----> normal voice", "blue");
+                    break;
+                case MSG_VAD_NOSPEECH:
+                    updateLog(" ----> no speech", "blue");
+                    break;
+                case MSG_ERROR:
+                    updateLog(" ----> " + msg.toString(), "red");
+                    break;
+                default:
+                    super.handleMessage(msg);
+                    break;
+
+
+
+            }
+
+
+
+        }
+    };
+
+
+    public class MyAsyncTask extends AsyncTask<Void, Void, Void> {
+
+        @Override
+        protected void onPreExecute()
+        {
+
+        }
+
+        @Override
+        protected Void doInBackground(Void... params)
+        {
+            while(global.Location==""){}
+            uploadFile(global.Location);
+            return null;
+
+        }
+
+        @Override
+        protected void onPostExecute(Void v)
+        {
+            global.Location="";
+            showToast("image uploaded");
+        }
+
+    }
+
+    //android upload file to server
+    public void uploadFile( String selectedFilePath) {
+
+
+        int serverResponseCode = 0;
+        HttpURLConnection connection;
+        DataOutputStream dataOutputStream;
+        String lineEnd = "\r\n";
+        String twoHyphens = "--";
+        String boundary = "*****";
+
+
+        int bytesRead, bytesAvailable, bufferSize;
+        byte[] buffer;
+        int maxBufferSize = 1 * 1024 * 1024;
+        File selectedFile = new File(selectedFilePath);
+
+
+        String[] parts = selectedFilePath.split("/");
+        final String fileName = parts[parts.length - 1];
+
+        if (!selectedFile.isFile()) {
+            //dialog.dismiss();
+            //Log.v(TAG,"gloabal"+selectedFilePath);
+            //showToast(selectedFilePath);
+            //showToast("file issue");
+            return;
+        } else {
+            try {
+
+                //Log.v(TAG, "im in try");
+
+
+                FileInputStream fileInputStream = new FileInputStream(selectedFile);
+                URL url = new URL(SERVER_URL);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setDoInput(true);//Allow Inputs
+                connection.setDoOutput(true);//Allow Outputs
+                connection.setUseCaches(false);//Don't use a cached Copy
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Connection", "Keep-Alive");
+                connection.setRequestProperty("ENCTYPE", "multipart/form-data");
+                connection.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
+                connection.setRequestProperty("uploaded_file", selectedFilePath);
+                //showToast(selectedFilePath);
+                //creating new dataoutputstream
+
+                dataOutputStream = new DataOutputStream(connection.getOutputStream());
+                //showToast("im after path");
+                //writing bytes to data outputstream
+                dataOutputStream.writeBytes(twoHyphens + boundary + lineEnd);
+
+                dataOutputStream.writeBytes("Content-Disposition: form-data; name=\"uploaded_file\";filename=\""
+                        + selectedFilePath + "\"" + lineEnd);
+
+                dataOutputStream.writeBytes(lineEnd);
+
+
+                //returns no. of bytes present in fileInputStream
+                bytesAvailable = fileInputStream.available();
+                //selecting the buffer size as minimum of available bytes or 1 MB
+                bufferSize = Math.min(bytesAvailable, maxBufferSize);
+                //setting the buffer as byte array of size of bufferSize
+                buffer = new byte[bufferSize];
+
+                //reads bytes from FileInputStream(from 0th index of buffer to buffersize)
+                bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+
+                //Log.v(TAG, "before while");
+
+
+                //loop repeats till bytesRead = -1, i.e., no bytes are left to read
+                while (bytesRead > 0) {
+                    //write the bytes read from inputstream
+                    dataOutputStream.write(buffer, 0, bufferSize);
+                    bytesAvailable = fileInputStream.available();
+                    bufferSize = Math.min(bytesAvailable, maxBufferSize);
+                    bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+                }
+                //Log.v(TAG, "after while");
+
+                dataOutputStream.writeBytes(lineEnd);
+                dataOutputStream.writeBytes(twoHyphens + boundary + twoHyphens + lineEnd);
+
+                serverResponseCode = connection.getResponseCode();
+                String serverResponseMessage = connection.getResponseMessage();
+
+                Log.i(TAG, "Server Response is: " + serverResponseMessage + ": " + serverResponseCode);
+
+                //response code of 200 indicates the server status OK
+                if (serverResponseCode == 200) {
+                    Log.v(TAG, "file upload complete");
+                }
+
+                Log.v(TAG, "now close");
+
+                //closing the input and output streams
+                fileInputStream.close();
+                dataOutputStream.flush();
+                dataOutputStream.close();
+
+                Log.v(TAG, "CLosed ");
+
+
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        //showToast("FIle not found");
+                    }
+                });
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+                //showToast("URL error");
+
+            } catch (IOException e) {
+                e.printStackTrace();
+                //showToast("Cannot read/Write file");
+            }
+            dialog.dismiss();
+            //postData("langitudes----","longitues----");
+
+            //return serverResponseCode;
+        }
+
+    }
+
 
     void showToast(CharSequence msg) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
@@ -211,99 +522,6 @@ public class Demo extends Activity {
         }
     };
 
-
-    public Handler handle = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            MsgEnum message = MsgEnum.getMsgEnum(msg.what);
-            switch (message) {
-                case MSG_ACTIVE:
-                    activeTimes++;
-                    global.Location="";
-                    updateLog(" ----> Detected " + activeTimes + " times", "green");
-                    // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
-                    showToast("Active " + activeTimes);
-                    //sms_text="HELP ME LALAN KUMAR" + '\n' + "My location is";
-
-                    ////// CAMERA CODE
-
-                    // do we have a camera?
-                    if (!getPackageManager()
-                            .hasSystemFeature(PackageManager.FEATURE_CAMERA)) {
-                        showToast("No camera on this device");
-
-                    } else {
-                        cameraId = findFrontFacingCamera();
-                        if (cameraId < 0) {
-                            showToast("No front facing camera found.");
-
-                        } else {
-                            camera = Camera.open(cameraId);
-                        }
-                    }
-                    camera.startPreview();
-                    camera.takePicture(null, null, new photohandler(getApplicationContext(), default_location));
-
-                    ///// GPS LOCATION
-                    updateLog("before getlocation");
-                    getLocation();
-                    updateLog("after getlocation");
-
-                    ////// SMS CODE
-
-                    String phoneNo = "8447828766";
-
-
-                    PackageManager pm = getApplicationContext().getPackageManager();
-
-                    if (!pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY) &&
-                            !pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_CDMA)) {
-                        showToast("Sorry, your device probably can't send SMS...");
-                    }
-
-                    try {
-                        SmsManager smsManager = SmsManager.getDefault();
-                        //smsManager.sendTextMessage(phoneNo, null, sms_text, null, null);
-                        showToast("SMS Sent!");
-                    } catch (Exception e) {
-                        showToast("SMS faild, please try again later!");
-                        e.printStackTrace();
-                    }
-
-
-                    uploadFile(global.Location);
-                    Log.v(TAG, "globaal"+global.Location);
-
-
-                    break;
-                case MSG_INFO:
-                    updateLog(" ----> " + message);
-                    break;
-                case MSG_VAD_SPEECH:
-                    updateLog(" ----> normal voice", "blue");
-                    break;
-                case MSG_VAD_NOSPEECH:
-                    updateLog(" ----> no speech", "blue");
-                    break;
-                case MSG_ERROR:
-                    updateLog(" ----> " + msg.toString(), "red");
-                    break;
-                default:
-                    super.handleMessage(msg);
-                    break;
-
-
-
-            }
-
-
-
-
-
-        }
-    };
-
-
     private void getLocation() {
         updateLog("im in");
         mFusedLocationClient.getLastLocation().addOnSuccessListener(this, new OnSuccessListener<Location>() {
@@ -324,7 +542,6 @@ public class Demo extends Activity {
         updateLog("Im out");
     }
 
-
     private int findFrontFacingCamera() {
         int cameraId = -1;
         // Search for the front facing camera
@@ -340,7 +557,6 @@ public class Demo extends Activity {
         }
         return cameraId;
     }
-
 
     public void updateLog(final String text) {
 
@@ -368,7 +584,6 @@ public class Demo extends Activity {
 
     static int MAX_LOG_LINE_NUM = 200;
     static int currLogLineNum = 0;
-
     public void updateLog(final String text, final String color) {
         log.post(new Runnable() {
             @Override
@@ -391,12 +606,10 @@ public class Demo extends Activity {
             }
         });
     }
-
     private void emptyLog() {
         strLog = null;
         log.setText("");
     }
-
     @Override
     public void onDestroy() {
         restoreVolume();
@@ -405,134 +618,64 @@ public class Demo extends Activity {
     }
 
 
-    //android upload file to server
-    public void uploadFile( String selectedFilePath) {
+//    private void check_permisssions()
+//    {
+//        if (ContextCompat.checkSelfPermission(getActivity(),
+//                Manifest.permission.SEND_SMS) + ContextCompat
+//                .checkSelfPermission(getActivity(),
+//                        Manifest.permission.CAMERA)+ContextCompat
+//                .checkSelfPermission(getActivity(),
+//                        Manifest.permission.RECORD_AUDIO)+ContextCompat
+//                .checkSelfPermission(getActivity(),
+//                        Manifest.permission.WRITE_EXTERNAL_STORAGE)+ContextCompat
+//                .checkSelfPermission(getActivity(),
+//                        Manifest.permission.ACCESS_COARSE_LOCATION)+ContextCompat
+//                .checkSelfPermission(getActivity(),
+//                        Manifest.permission.ACCESS_FINE_LOCATION)
+//                != PackageManager.PERMISSION_GRANTED) {
+//
+//            if (ActivityCompat.shouldShowRequestPermissionRationale
+//                    (getActivity(), Manifest.permission.SEND_SMS) ||
+//                    ActivityCompat.shouldShowRequestPermissionRationale
+//                            (getActivity(), Manifest.permission.CAMERA)) ||
+//            ActivityCompat.shouldShowRequestPermissionRationale
+//                    (getActivity(), Manifest.permission.RECORD_AUDIO)) ||
+//            ActivityCompat.shouldShowRequestPermissionRationale
+//                    (getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE)) ||
+//            ActivityCompat.shouldShowRequestPermissionRationale
+//                    (getActivity(), Manifest.permission.ACCESS_COARSE_LOCATION)) ||
+//            ActivityCompat.shouldShowRequestPermissionRationale
+//                    (getActivity(), Manifest.permission.ACCESS_FINE_LOCATION)
+//
+//            {
+//
+//                Snackbar.make(getActivity().findViewById(android.R.id.content),
+//                        "Please Grant Permissions to upload profile photo",
+//                        Snackbar.LENGTH_INDEFINITE).setAction("ENABLE",
+//                        new View.OnClickListener() {
+//                            @Override
+//                            public void onClick(View v) {
+//                                requestPermissions(
+//                                        new String[]{Manifest.permission
+//                                                .SEND_SMS, Manifest.permission.CAMERA,Manifest.permission.RECORD_AUDIO,
+//                                                Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.ACCESS_COARSE_LOCATION,
+//                                                Manifest.permission.ACCESS_FINE_LOCATION},
+//                                        PERMISSIONS_MULTIPLE_REQUEST);
+//                            }
+//                        }).show();
+//            } else {
+//                requestPermissions(
+//                        new String[]{Manifest.permission
+//                                .SEND_SMS, Manifest.permission.CAMERA,Manifest.permission.RECORD_AUDIO,
+//                                Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.ACCESS_COARSE_LOCATION,
+//                                Manifest.permission.ACCESS_FINE_LOCATION},
+//                        PERMISSIONS_MULTIPLE_REQUEST);
+//            }
+//        } else {
+//            // write your logic code if permission already granted
+//        }
+//    }
 
-
-        int serverResponseCode = 0;
-
-        HttpURLConnection connection;
-        DataOutputStream dataOutputStream;
-        String lineEnd = "\r\n";
-        String twoHyphens = "--";
-        String boundary = "*****";
-
-
-        int bytesRead, bytesAvailable, bufferSize;
-        byte[] buffer;
-        int maxBufferSize = 1 * 1024 * 1024;
-        File selectedFile = new File(selectedFilePath);
-
-
-        String[] parts = selectedFilePath.split("/");
-        final String fileName = parts[parts.length - 1];
-
-        if (!selectedFile.isFile()) {
-            //dialog.dismiss();
-            Log.v(TAG,"gloabal"+selectedFilePath);
-            showToast(selectedFilePath);
-            showToast("file issue");
-            return;
-        } else {
-            try {
-
-                //Log.v(TAG, "im in try");
-
-
-                FileInputStream fileInputStream = new FileInputStream(selectedFile);
-                URL url = new URL(SERVER_URL);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setDoInput(true);//Allow Inputs
-                connection.setDoOutput(true);//Allow Outputs
-                connection.setUseCaches(false);//Don't use a cached Copy
-                connection.setRequestMethod("POST");
-                connection.setRequestProperty("Connection", "Keep-Alive");
-                connection.setRequestProperty("ENCTYPE", "multipart/form-data");
-                connection.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
-                connection.setRequestProperty("uploaded_file", selectedFilePath);
-                //showToast(selectedFilePath);
-                //creating new dataoutputstream
-                showToast("im after path");
-                dataOutputStream = new DataOutputStream(connection.getOutputStream());
-
-                //writing bytes to data outputstream
-                dataOutputStream.writeBytes(twoHyphens + boundary + lineEnd);
-
-                dataOutputStream.writeBytes("Content-Disposition: form-data; name=\"uploaded_file\";filename=\""
-                        + selectedFilePath + "\"" + lineEnd);
-
-                dataOutputStream.writeBytes(lineEnd);
-
-
-                //returns no. of bytes present in fileInputStream
-                bytesAvailable = fileInputStream.available();
-                //selecting the buffer size as minimum of available bytes or 1 MB
-                bufferSize = Math.min(bytesAvailable, maxBufferSize);
-                //setting the buffer as byte array of size of bufferSize
-                buffer = new byte[bufferSize];
-
-                //reads bytes from FileInputStream(from 0th index of buffer to buffersize)
-                bytesRead = fileInputStream.read(buffer, 0, bufferSize);
-
-                //Log.v(TAG, "before while");
-
-
-                //loop repeats till bytesRead = -1, i.e., no bytes are left to read
-                while (bytesRead > 0) {
-                    //write the bytes read from inputstream
-                    dataOutputStream.write(buffer, 0, bufferSize);
-                    bytesAvailable = fileInputStream.available();
-                    bufferSize = Math.min(bytesAvailable, maxBufferSize);
-                    bytesRead = fileInputStream.read(buffer, 0, bufferSize);
-                }
-                //Log.v(TAG, "after while");
-
-                dataOutputStream.writeBytes(lineEnd);
-                dataOutputStream.writeBytes(twoHyphens + boundary + twoHyphens + lineEnd);
-
-                serverResponseCode = connection.getResponseCode();
-                String serverResponseMessage = connection.getResponseMessage();
-
-                Log.i(TAG, "Server Response is: " + serverResponseMessage + ": " + serverResponseCode);
-
-                //response code of 200 indicates the server status OK
-                if (serverResponseCode == 200) {
-                    Log.v(TAG, "file upload complete");
-                }
-
-                Log.v(TAG, "now close");
-
-                //closing the input and output streams
-                fileInputStream.close();
-                dataOutputStream.flush();
-                dataOutputStream.close();
-
-                Log.v(TAG, "CLosed ");
-
-
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        showToast("FIle not found");
-                    }
-                });
-            } catch (MalformedURLException e) {
-                e.printStackTrace();
-                showToast("URL error");
-
-            } catch (IOException e) {
-                e.printStackTrace();
-                showToast("Cannot read/Write file");
-            }
-            dialog.dismiss();
-            //postData("langitudes----","longitues----");
-
-            //return serverResponseCode;
-        }
-
-    }
 
 
 
